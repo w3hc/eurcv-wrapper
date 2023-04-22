@@ -83,5 +83,40 @@ describe("SmartCoin", function () {
       await eur.validateTransfer(trasferHash2)
       expect(await eur.balanceOf(bob.address)).to.equal(parseEther('1'))
     })
+
+    it("Should confiscate Bob's money (1 unit)", async function () {
+      const { eur, alice, bob } = await loadFixture(deployContractsFixture)
+
+      // Alice gets whitelisted
+      await eur.addAddressToWhitelist(alice.address)
+
+      // The bank transfers 10 units to Alice
+      const transfer10 = await eur.transfer(alice.address, parseEther('10'))
+      const blockNumber = transfer10.blockNumber
+      const transferRequested = await eur.queryFilter('TransferRequested' as any, blockNumber)
+      const trasferHash = transferRequested[0].args.transferHash
+
+      // The bank allows allows Alice to receive the money
+      await eur.validateTransfer(trasferHash)
+      expect(await eur.balanceOf(alice.address)).to.equal(parseEther('10'))
+
+      // Bob gets whitelisted
+      await eur.addAddressToWhitelist(bob.address)
+
+      // Alice gives 1 unit to Bob
+      const transfer2 = await eur.connect(alice).transfer(bob.address, parseEther('1'))
+      const blockNumber2 = transfer2.blockNumber
+      const transferRequested2 = await eur.queryFilter('TransferRequested' as any, blockNumber2)
+
+      // The bank allows allows Bob to receive the money
+      const trasferHash2 = transferRequested2[0].args.transferHash
+      await eur.validateTransfer(trasferHash2)
+      expect(await eur.balanceOf(bob.address)).to.equal(parseEther('1'))
+
+      // The bank confiscates 1 unit from Bob (!)
+      await eur.recall(bob.address, parseEther('1'))
+      expect(await eur.balanceOf(bob.address)).to.equal(parseEther('0'))
+    })
+
   })
 })
